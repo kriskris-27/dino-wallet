@@ -28,11 +28,19 @@ CREATE TABLE accounts (
     asset_type_id INTEGER NOT NULL REFERENCES asset_types(id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     
+    -- Constraints
     CONSTRAINT owner_check CHECK (
         (owner_type = 'USER' AND user_id IS NOT NULL AND system_name IS NULL) OR
         (owner_type = 'SYSTEM' AND system_name IS NOT NULL AND user_id IS NULL)
-    ),
-    UNIQUE (owner_type, COALESCE(user_id, 0), COALESCE(system_name, ''), asset_type_id)
+    )
+);
+
+-- Unique constraint using functional index to handle NULLs
+CREATE UNIQUE INDEX uq_owner_asset ON accounts (
+    owner_type, 
+    COALESCE(user_id, 0), 
+    COALESCE(system_name, ''), 
+    asset_type_id
 );
 
 -- Balances Cache Table
