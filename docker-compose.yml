@@ -21,6 +21,8 @@ services:
       - db
     ports:
       - "8000:8000"
+    volumes:
+      - .:/app
     environment:
       - DATABASE_URL=postgresql+psycopg2://wallet_user:wallet_password@db:5432/wallet_db
     restart: on-failure
