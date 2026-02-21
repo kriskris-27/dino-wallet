@@ -44,6 +44,16 @@ def get_user_balances(user_id: int, db: Session = Depends(get_db)):
 
 @router.post("/topup", response_model=schemas.TransactionResponse)
 def top_up_wallet(request: schemas.TopUpRequest, db: Session = Depends(get_db)):
+    # 0. Check idempotency (Problem #2)
+    existing_tx = db.query(LedgerTransaction).filter(
+        LedgerTransaction.idempotency_key == request.idempotencyKey
+    ).first()
+    if existing_tx:
+        return {
+            "transactionId": str(existing_tx.id),
+            "status": "completed"
+        }
+
     # 1. Resolve asset_type_id
     asset = db.query(AssetType).filter(AssetType.code == request.assetCode).first()
     if not asset:
@@ -63,13 +73,27 @@ def top_up_wallet(request: schemas.TopUpRequest, db: Session = Depends(get_db)):
     if not user_account or not treasury_account:
         raise HTTPException(status_code=404, detail="Account not found")
     
-    # 3. Update balances
-    user_balance = db.query(Balance).filter(Balance.account_id == user_account.id).first()
-    treasury_balance = db.query(Balance).filter(Balance.account_id == treasury_account.id).first()
+    # 3. Update balances with pessimistic local locking (Problem #1)
+    # We lock rows in a consistent order (by ID) to prevent deadlocks
+    account_ids = sorted([user_account.id, treasury_account.id])
     
-    if not user_balance or not treasury_balance:
+    # Executing the query with with_for_update() locks the selected rows in the DB
+    # Postgres locks these in the order they appear in the index (account_id)
+    balances = (
+        db.query(Balance)
+        .filter(Balance.account_id.in_(account_ids))
+        .with_for_update()
+        .all()
+    )
+    
+    if len(balances) != 2:
         raise HTTPException(status_code=404, detail="Balance record not found")
         
+    # Map them back for easy update
+    balance_map = {b.account_id: b for b in balances}
+    user_balance = balance_map[user_account.id]
+    treasury_balance = balance_map[treasury_account.id]
+    
     # Naive update: just add/subtract
     user_balance.balance += request.amount
     treasury_balance.balance -= request.amount
@@ -78,14 +102,10 @@ def top_up_wallet(request: schemas.TopUpRequest, db: Session = Depends(get_db)):
     import uuid
     transaction_id = uuid.uuid4()
     
-    # Using a simple idempotency key for now since it's required by the DB schema
-    # although the prompt said "No idempotency yet", the DB constraint requires it.
-    idempotency_key = f"topup_{transaction_id}"
-    
     new_tx = LedgerTransaction(
         id=transaction_id,
         type=TransactionType.TOPUP,
-        idempotency_key=idempotency_key,
+        idempotency_key=request.idempotencyKey,
         asset_type_id=asset.id,
         amount=request.amount,
         from_account_id=treasury_account.id,

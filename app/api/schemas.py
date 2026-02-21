@@ -13,6 +13,7 @@ class TopUpRequest(BaseModel):
     userId: int
     assetCode: str
     amount: int
+    idempotencyKey: str
 
 class TransactionResponse(BaseModel):
     transactionId: str
