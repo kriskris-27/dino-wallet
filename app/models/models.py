@@ -66,6 +66,8 @@ class LedgerTransaction(Base):
     metadata_json = Column("metadata", JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=text("now()"))
 
+    entries = relationship("LedgerEntry", back_populates="transaction", cascade="all, delete-orphan")
+
     __table_args__ = (
         CheckConstraint("amount > 0", name="amount_positive"),
     )
@@ -77,3 +79,5 @@ class LedgerEntry(Base):
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
     amount = Column(BigInteger, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=text("now()"))
+
+    transaction = relationship("LedgerTransaction", back_populates="entries")
