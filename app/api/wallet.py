@@ -115,3 +115,21 @@ def top_up_wallet(request: schemas.TopUpRequest, db: Session = Depends(get_db)):
         "transactionId": str(transaction_id),
         "status": "completed"
     }
+
+@router.get("/treasury/balances", response_model=schemas.SystemBalancesResponse)
+def get_treasury_balances(db: Session = Depends(get_db)):
+    # Query balances for the treasury system name
+    results = (
+        db.query(AssetType.code, Balance.balance)
+        .join(Account, Account.asset_type_id == AssetType.id)
+        .join(Balance, Balance.account_id == Account.id)
+        .filter(Account.system_name == "TREASURY")
+        .all()
+    )
+    
+    balances = [{"asset": row.code, "balance": row.balance} for row in results]
+    
+    return {
+        "systemName": "TREASURY",
+        "balances": balances
+    }

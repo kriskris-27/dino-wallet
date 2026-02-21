@@ -17,3 +17,7 @@ class TopUpRequest(BaseModel):
 class TransactionResponse(BaseModel):
     transactionId: str
     status: str
+
+class SystemBalancesResponse(BaseModel):
+    systemName: str
+    balances: List[BalanceResponse]
