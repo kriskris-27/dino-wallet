@@ -35,3 +35,16 @@ class TransactionResponse(BaseModel):
 class SystemBalancesResponse(BaseModel):
     systemName: str
     balances: List[BalanceResponse]
+
+class TransactionDetail(BaseModel):
+    id: str
+    type: str
+    assetCode: str
+    amount: int
+    status: str
+    createdAt: str
+    # otherParty: str # We Can add this later if needed
+
+class TransactionHistoryResponse(BaseModel):
+    userId: int
+    transactions: List[TransactionDetail]

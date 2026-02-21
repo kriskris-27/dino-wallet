@@ -340,6 +340,50 @@ def transfer_credits(request: schemas.TransferRequest, db: Session = Depends(get
     
     return {"transactionId": str(transaction_id), "status": "completed"}
 
+@router.get("/users/{user_id}/transactions", response_model=schemas.TransactionHistoryResponse)
+def get_user_transaction_history(user_id: int, db: Session = Depends(get_db)):
+    # 1. Check if user exists
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # 2. Get all accounts for this user to filter transactions
+    user_account_ids = [acc.id for acc in db.query(Account.id).filter(Account.user_id == user_id).all()]
+    
+    if not user_account_ids:
+        return {"userId": user_id, "transactions": []}
+    
+    # 3. Query LedgerTransaction
+    # A transaction involves the user if they are the sender or receiver
+    transactions = (
+        db.query(LedgerTransaction)
+        .join(AssetType, AssetType.id == LedgerTransaction.asset_type_id)
+        .filter(
+            (LedgerTransaction.from_account_id.in_(user_account_ids)) |
+            (LedgerTransaction.to_account_id.in_(user_account_ids))
+        )
+        .order_by(LedgerTransaction.created_at.desc())
+        .all()
+    )
+    
+    history = []
+    for tx in transactions:
+        # Determine if it's an inflow or outflow for the user
+        # This is a simplification for history display
+        history.append({
+            "id": str(tx.id),
+            "type": tx.type,
+            "assetCode": tx.asset_type.code,
+            "amount": tx.amount,
+            "status": "completed",
+            "createdAt": tx.created_at.isoformat()
+        })
+        
+    return {
+        "userId": user_id,
+        "transactions": history
+    }
+
 @router.get("/treasury/balances", response_model=schemas.SystemBalancesResponse)
 def get_treasury_balances(db: Session = Depends(get_db)):
     # Query balances for the treasury system name
