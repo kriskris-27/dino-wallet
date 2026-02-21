@@ -13,6 +13,7 @@ class TransactionType(str, enum.Enum):
     TOPUP = "TOPUP"
     BONUS = "BONUS"
     SPEND = "SPEND"
+    TRANSFER = "TRANSFER"
 
 class AssetType(Base):
     __tablename__ = "asset_types"

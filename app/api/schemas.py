@@ -15,6 +15,19 @@ class TopUpRequest(BaseModel):
     amount: int
     idempotencyKey: str
 
+class SpendRequest(BaseModel):
+    userId: int
+    assetCode: str
+    amount: int
+    idempotencyKey: str
+
+class TransferRequest(BaseModel):
+    fromUserId: int
+    toUserId: int
+    assetCode: str
+    amount: int
+    idempotencyKey: str
+
 class TransactionResponse(BaseModel):
     transactionId: str
     status: str
