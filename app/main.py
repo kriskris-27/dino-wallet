@@ -13,16 +13,16 @@ def welcome():
         "version": "1.0.0",
         "documentation": "/docs",
         "endpoints": {
-            "/": "You are here! Overview of the API.",
-            "/health": "Check if the API and Database are breathing.",
-            "/v1/users/{id}/balances": "Check how much gold/diamonds a user has.",
-            "/v1/users/{id}/transactions": "Full audit trail of everything a user has done.",
-            "/v1/topup": "Add credits to a wallet (usually from a real-money purchase).",
-            "/v1/spend": "Spend credits on in-game items or skins.",
-            "/v1/bonus": "Free loyalty points or system-issued rewards.",
-            "/v1/treasury/balances": "Internal view of the system's total funds."
+            "/": "Overview of all available routes.",
+            "/health": "Check API and Database status.",
+            "/v1/users/{id}/balances": "Get current balances for a user.",
+            "/v1/users/{id}/transactions": "Get transaction history for a user.",
+            "/v1/topup": "Add funds to a user wallet.",
+            "/v1/spend": "Deduct funds from a user wallet.",
+            "/v1/bonus": "Issue bonus funds to a user.",
+            "/v1/treasury/balances": "Check system treasury status."
         },
-        "rationale": "Built for high-concurrency gaming environments using a double-entry ledger for zero-error accounting."
+        "rationale": "Built with a double-entry ledger and pessimistic locking for high-concurrency safety."
     }
 
 @app.get("/health")
