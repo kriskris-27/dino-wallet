@@ -68,6 +68,7 @@ class LedgerTransaction(Base):
     created_at = Column(DateTime(timezone=True), server_default=text("now()"))
 
     entries = relationship("LedgerEntry", back_populates="transaction", cascade="all, delete-orphan")
+    asset_type = relationship("AssetType")
 
     __table_args__ = (
         CheckConstraint("amount > 0", name="amount_positive"),

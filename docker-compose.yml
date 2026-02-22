@@ -9,8 +9,6 @@ services:
       POSTGRES_DB: wallet_db
       POSTGRES_USER: wallet_user
       POSTGRES_PASSWORD: wallet_password
-    ports:
-      - "5432:5432"
     volumes:
       - ./db/init:/docker-entrypoint-initdb.d
 

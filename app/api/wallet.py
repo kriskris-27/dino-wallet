@@ -49,9 +49,10 @@ def get_user_balances(user_id: int, db: Session = Depends(get_db)):
 
 @router.post("/topup", response_model=schemas.TransactionResponse)
 def top_up_wallet(request: schemas.TopUpRequest, db: Session = Depends(get_db)):
-    # 0. Check idempotency (Problem #2)
+    # 0. Check idempotency (Problem #2) - Scoped per user
+    scoped_key = f"user_{request.userId}:{request.idempotencyKey}"
     existing_tx = db.query(LedgerTransaction).filter(
-        LedgerTransaction.idempotency_key == request.idempotencyKey
+        LedgerTransaction.idempotency_key == scoped_key
     ).first()
     if existing_tx:
         return {
@@ -117,7 +118,7 @@ def top_up_wallet(request: schemas.TopUpRequest, db: Session = Depends(get_db)):
     new_tx = LedgerTransaction(
         id=transaction_id,
         type=TransactionType.TOPUP,
-        idempotency_key=request.idempotencyKey,
+        idempotency_key=scoped_key,
         asset_type_id=asset.id,
         amount=request.amount,
         from_account_id=treasury_account.id,
@@ -159,9 +160,10 @@ def top_up_wallet(request: schemas.TopUpRequest, db: Session = Depends(get_db)):
 
 @router.post("/spend", response_model=schemas.TransactionResponse)
 def spend_credits(request: schemas.SpendRequest, db: Session = Depends(get_db)):
-    # 0. Check idempotency
+    # 0. Check idempotency - Scoped per user
+    scoped_key = f"user_{request.userId}:{request.idempotencyKey}"
     existing_tx = db.query(LedgerTransaction).filter(
-        LedgerTransaction.idempotency_key == request.idempotencyKey
+        LedgerTransaction.idempotency_key == scoped_key
     ).first()
     if existing_tx:
         return {"transactionId": str(existing_tx.id), "status": "completed"}
@@ -219,7 +221,7 @@ def spend_credits(request: schemas.SpendRequest, db: Session = Depends(get_db)):
     new_tx = LedgerTransaction(
         id=transaction_id,
         type=TransactionType.SPEND,
-        idempotency_key=request.idempotencyKey,
+        idempotency_key=scoped_key,
         asset_type_id=asset.id,
         amount=request.amount,
         from_account_id=user_account.id,
@@ -246,9 +248,10 @@ def spend_credits(request: schemas.SpendRequest, db: Session = Depends(get_db)):
 
 @router.post("/transfer", response_model=schemas.TransactionResponse)
 def transfer_credits(request: schemas.TransferRequest, db: Session = Depends(get_db)):
-    # 0. Check idempotency
+    # 0. Check idempotency - Scoped per sender
+    scoped_key = f"user_{request.fromUserId}:{request.idempotencyKey}"
     existing_tx = db.query(LedgerTransaction).filter(
-        LedgerTransaction.idempotency_key == request.idempotencyKey
+        LedgerTransaction.idempotency_key == scoped_key
     ).first()
     if existing_tx:
         return {"transactionId": str(existing_tx.id), "status": "completed"}
@@ -311,7 +314,7 @@ def transfer_credits(request: schemas.TransferRequest, db: Session = Depends(get
     new_tx = LedgerTransaction(
         id=transaction_id,
         type=TransactionType.TRANSFER, # Use TRANSFER type for user-to-user transfers
-        idempotency_key=request.idempotencyKey,
+        idempotency_key=scoped_key,
         asset_type_id=asset.id,
         amount=request.amount,
         from_account_id=from_account.id,
