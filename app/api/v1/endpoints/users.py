@@ -57,6 +57,3 @@ def get_user_transaction_history(user_id: int, db: Session = Depends(get_db)):
     } for tx in transactions]
         
     return {"userId": user_id, "transactions": history}
-坐坐 (NO!!)
-坐坐
-坐坐 (I am doing it.)

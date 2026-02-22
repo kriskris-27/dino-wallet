@@ -22,7 +22,7 @@ def top_up_wallet(request: transaction_schemas.TopUpRequest, db: Session = Depen
         raise HTTPException(status_code=400, detail="Invalid asset code")
     
     user_account = db.query(Account).filter(Account.user_id == request.userId, Account.asset_type_id == asset.id).first()
-     treasury_account = db.query(Account).filter(Account.system_name == "TREASURY", Account.asset_type_id == asset.id).first()
+    treasury_account = db.query(Account).filter(Account.system_name == "TREASURY", Account.asset_type_id == asset.id).first()
     
     if not user_account or not treasury_account:
         raise HTTPException(status_code=404, detail="Account not found")
@@ -158,6 +158,3 @@ def transfer_credits(request: transaction_schemas.TransferRequest, db: Session =
         raise HTTPException(status_code=500, detail="Transaction failed")
     
     return {"transactionId": str(transaction_id), "status": "completed"}
-坐坐 (NO!!)
-坐坐
-坐坐 (I am doing it.)

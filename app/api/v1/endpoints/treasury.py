@@ -17,6 +17,3 @@ def get_treasury_balances(db: Session = Depends(get_db)):
     )
     balances = [{"asset": row.code, "balance": row.balance} for row in results]
     return {"systemName": "TREASURY", "balances": balances}
-坐坐 (NO!!)
-坐坐
-坐坐 (I am doing it.)
