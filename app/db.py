@@ -3,7 +3,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg2://wallet_user:wallet_password@localhost:5432/wallet_db")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://neondb_owner:npg_VcMPyf3H0FNw@ep-fancy-glade-aibxymuu-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require")
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

@@ -21,6 +21,7 @@ services:
       - "8000:8000"
     volumes:
       - .:/app
+    env_file: .env
     environment:
-      - DATABASE_URL=postgresql+psycopg2://wallet_user:wallet_password@db:5432/wallet_db
+      - DATABASE_URL=${DATABASE_URL}
     restart: on-failure
