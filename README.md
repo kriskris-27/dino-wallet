@@ -1,65 +1,40 @@
-# Virtual Wallet Service
+# Dino Wallet Service
 
-A robust, production-ready virtual wallet backend built for high-traffic applications. This service implements a **Double-Entry Ledger Architecture** to ensure 100% data integrity and auditability for virtual credits (e.g., Gold Coins, Reward Points).
+This is a high-performance virtual wallet backend. I built it with a double-entry ledger system to make sure every cent/coin is accounted for, and it handles heavy concurrent traffic without breaking.
 
----
+## Tech Stack & Why
 
-## 🚀 Getting Started
+*   **FastAPI (Python 3.11)**: It's the fastest way to get a robust API up. It handles async out of the box and the Pydantic integration means I don't have to write manual validation for every request.
+*   **PostgreSQL**: For a wallet, you need ACID. Postgres is the industry standard for financial data, and its row-level locking is exactly what we need for concurrency.
+*   **SQLAlchemy 2.0**: The new typed syntax makes the DB layer clean and hard to screw up with type errors.
+*   **Docker**: To make sure "it works on my machine" means "it works on yours, too."
 
-### Prerequisites
-- Docker and Docker Compose installed.
+## Getting Started (Local & Cloud)
 
-### Run with Docker
-1. Build and start the services:
-   ```bash
-   docker-compose up --build -d
-   ```
+Everything is containerized. You can spin up the whole stack (API + DB) with:
 
-2. Access the API documentation (Swagger UI):
-   - `http://localhost:8000/docs`
+```bash
+docker-compose up --build
+```
 
-3. Base URL: `http://localhost:8000`
+### Automatic Database Setup
+I've automated the DB initialization. When the container starts, an entrypoint script (`scripts/entrypoint.sh`) runs a Python utility I wrote (`scripts/init_db.py`). 
+*   It detects if the database is already set up.
+*   If it's empty (like a fresh Neon DB), it automatically runs the `01_schema.sql` and `02_seed.sql` scripts.
+*   This seeds asset types (`GOLD`, `DIAMOND`, `POINT`) and initial users (`alice`, `bob`) so you can start testing immediately.
 
----
+## Concurrency & Safety
 
-## 🛠 Tech Stack & Choices
+Handling simultaneous transactions (like two people spending at the exact same millisecond) is the core problem. Here's my strategy:
 
-- **Language**: Python 3.11 with **FastAPI**.
-  - *Why?* FastAPI provides high performance (ASGI), automatic OpenAPI documentation, and excellent type safety, which is critical for financial logic.
-- **Database**: **PostgreSQL 16**.
-  - *Why?* Relational databases are essential for atomic transactions. PostgreSQL's `FOR UPDATE` locking mechanism is industry-standard for handling financial race conditions.
-- **ORM**: **SQLAlchemy 2.0**.
-  - *Why?* Modern SQLAlchemy (2.0+) provides a powerful, type-safe way to manage complex transactions and ledger entries.
+1.  **Row-Level Locking**: I use `SELECT ... FOR UPDATE` when reading balances. This locks the specific rows so no other process can touch them until the transaction commits.
+2.  **Deadlock Prevention**: To avoid circular waits, I always sort the account IDs and lock them in strict ascending order. If you're moving funds between two accounts, Account 1 always gets locked before Account 2, no matter what.
+3.  **Idempotency**: Every write request (`/topup`, `/spend`, etc.) takes an `idempotencyKey`. It's scoped to the user (`user_{id}:{key}`), so retrying a failed network request won't result in charging the user twice.
 
----
+## Key Endpoints
 
-## 🏗 System Architecture
-
-### 1. Double-Entry Ledger System (Brownie Points 🌟)
-Instead of just updating a `balance` column, every transaction creates:
-- A record in `ledger_transactions`.
-- Exactly two offsetting entries in `ledger_entries` (Debit/Credit).
-This ensures that the total sum across all accounts always nets to zero, providing a full audit trail and absolute data integrity.
-
-### 2. Concurrency & Deadlock Avoidance (Critical Constraints & Brownie Points 🌟)
-- **Pessimistic Locking**: Every transaction uses `SELECT ... FOR UPDATE` on account rows. This prevents race conditions like "double spending" by ensuring only one transaction can modify a balance at a time.
-- **Deadlock Protection**: To prevent circular waits, the application ALWAYS locks account IDs in **strict ascending numerical order**. This is a robust mechanism to avoid deadlocks under high load.
-
-### 3. Idempotency (Critical Constraints 🛡️)
-- All transactional endpoints require an `idempotencyKey`.
-- We use **User-Scoped Idempotency**: Keys are stored as `user_{userId}:{clientKey}`. This prevents global key collisions and ensures that retried requests are handled safely without duplicate charges.
-
----
-
-## 📊 Seeding & Testing
-
-The system automatically initializes via `docker-compose` with:
-- **Assets**: `GOLD`, `DIAMOND`, `POINT`.
-- **System Accounts**: `TREASURY` (primary source of funds).
-- **User Accounts**: `alice` (ID: 1), `bob` (ID: 2).
-
-### Core API Endpoints:
-- `POST /v1/topup`: Wallet Top-up / Bonus (Treasury -> User).
-- `POST /v1/spend`: Purchase / Spend (User -> Treasury).
-- `GET /v1/users/{id}/balances`: Check user balances.
-- `GET /v1/users/{id}/transactions`: Full Audit Trail (History).
+*   `GET /v1/users/{id}/balances`: Current balances across all assets.
+*   `POST /v1/topup`: Buy credits (funded by Treasury).
+*   `POST /v1/spend`: Spend credits on in-game items (sent back to Treasury).
+*   `POST /v1/bonus`: Loyalty/incentive credits.
+*   `GET /v1/users/{id}/transactions`: Full audit log of the user's history.
