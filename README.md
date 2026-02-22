@@ -31,8 +31,53 @@ Handling simultaneous transactions (like two people spending at the exact same m
 2.  **Deadlock Prevention**: To avoid circular waits, I always sort the account IDs and lock them in strict ascending order. If you're moving funds between two accounts, Account 1 always gets locked before Account 2, no matter what.
 3.  **Idempotency**: Every write request (`/topup`, `/spend`, etc.) takes an `idempotencyKey`. It's scoped to the user (`user_{id}:{key}`), so retrying a failed network request won't result in charging the user twice.
 
-## Key Endpoints
+## Testing with CURL
 
+Here are some commands to test the API once it's running:
+
+### 1. Check Balances (User 1)
+```bash
+curl -X GET "http://localhost:8000/v1/users/1/balances"
+```
+
+### 2. Top Up Wallet
+```bash
+curl -X POST "http://localhost:8000/v1/topup" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "userId": 1,
+       "amount": 100,
+       "assetCode": "GOLD",
+       "idempotencyKey": "topup_test_001"
+     }'
+```
+
+### 3. Spend Credits
+```bash
+curl -X POST "http://localhost:8000/v1/spend" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "userId": 1,
+       "amount": 50,
+       "assetCode": "GOLD",
+       "idempotencyKey": "spend_test_001"
+     }'
+```
+
+### 4. Check Transaction History
+```bash
+curl -X GET "http://localhost:8000/v1/users/1/transactions"
+```
+
+### 5. Check Treasury Balances
+```bash
+curl -X GET "http://localhost:8000/v1/treasury/balances"
+```
+
+## Key Endpoints Summary
+
+*   `GET /`: Overview of the app and available routes.
+*   `GET /health`: System health check.
 *   `GET /v1/users/{id}/balances`: Current balances across all assets.
 *   `POST /v1/topup`: Buy credits (funded by Treasury).
 *   `POST /v1/spend`: Spend credits on in-game items (sent back to Treasury).
