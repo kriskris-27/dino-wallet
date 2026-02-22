@@ -12,9 +12,8 @@ class SpendRequest(BaseModel):
     amount: int = Field(gt=0)
     idempotencyKey: str
 
-class TransferRequest(BaseModel):
-    fromUserId: int
-    toUserId: int
+class BonusRequest(BaseModel):
+    userId: int
     assetCode: str
     amount: int = Field(gt=0)
     idempotencyKey: str

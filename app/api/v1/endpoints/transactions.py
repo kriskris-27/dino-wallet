@@ -108,9 +108,9 @@ def spend_credits(request: transaction_schemas.SpendRequest, db: Session = Depen
     
     return {"transactionId": str(transaction_id), "status": "completed"}
 
-@router.post("/transfer", response_model=transaction_schemas.TransactionResponse)
-def transfer_credits(request: transaction_schemas.TransferRequest, db: Session = Depends(get_db)):
-    scoped_key = f"user_{request.fromUserId}:{request.idempotencyKey}"
+@router.post("/bonus", response_model=transaction_schemas.TransactionResponse)
+def issue_bonus(request: transaction_schemas.BonusRequest, db: Session = Depends(get_db)):
+    scoped_key = f"user_{request.userId}:{request.idempotencyKey}"
     existing_tx = db.query(LedgerTransaction).filter(LedgerTransaction.idempotency_key == scoped_key).first()
     if existing_tx:
         return {"transactionId": str(existing_tx.id), "status": "completed"}
@@ -119,42 +119,43 @@ def transfer_credits(request: transaction_schemas.TransferRequest, db: Session =
     if not asset:
         raise HTTPException(status_code=400, detail="Invalid asset code")
     
-    from_account = db.query(Account).filter(Account.user_id == request.fromUserId, Account.asset_type_id == asset.id).first()
-    to_account = db.query(Account).filter(Account.user_id == request.toUserId, Account.asset_type_id == asset.id).first()
+    user_account = db.query(Account).filter(Account.user_id == request.userId, Account.asset_type_id == asset.id).first()
+    treasury_account = db.query(Account).filter(Account.system_name == "TREASURY", Account.asset_type_id == asset.id).first()
     
-    if not from_account or not to_account:
+    if not user_account or not treasury_account:
         raise HTTPException(status_code=404, detail="Account not found")
-    if from_account.id == to_account.id:
-        raise HTTPException(status_code=400, detail="Cannot transfer to self")
-
-    account_ids = sorted([from_account.id, to_account.id])
+    
+    account_ids = sorted([user_account.id, treasury_account.id])
     balances = db.query(Balance).filter(Balance.account_id.in_(account_ids)).with_for_update().all()
     if len(balances) != 2:
         raise HTTPException(status_code=404, detail="Balance record not found")
         
     balance_map = {b.account_id: b for b in balances}
-    from_balance = balance_map[from_account.id]
-    to_balance = balance_map[to_account.id]
+    user_balance = balance_map[user_account.id]
+    treasury_balance = balance_map[treasury_account.id]
     
-    if from_balance.balance < request.amount:
-        raise HTTPException(status_code=400, detail="Insufficient funds")
+    if treasury_balance.balance < request.amount:
+        raise HTTPException(status_code=400, detail="Insufficient treasury funds")
     
-    from_balance.balance -= request.amount
-    to_balance.balance += request.amount
+    user_balance.balance += request.amount
+    treasury_balance.balance -= request.amount
     
     transaction_id = uuid.uuid4()
     new_tx = LedgerTransaction(
-        id=transaction_id, type=TransactionType.TRANSFER, idempotency_key=scoped_key,
-        asset_type_id=asset.id, amount=request.amount, from_account_id=from_account.id, to_account_id=to_account.id
+        id=transaction_id, type=TransactionType.BONUS, idempotency_key=scoped_key,
+        asset_type_id=asset.id, amount=request.amount, from_account_id=treasury_account.id, to_account_id=user_account.id
     )
-    new_tx.entries.extend([LedgerEntry(account_id=from_account.id, amount=-request.amount), LedgerEntry(account_id=to_account.id, amount=request.amount)])
+    new_tx.entries.extend([
+        LedgerEntry(account_id=treasury_account.id, amount=-request.amount),
+        LedgerEntry(account_id=user_account.id, amount=request.amount)
+    ])
     
     db.add(new_tx)
     try:
         db.commit()
     except Exception as e:
         db.rollback()
-        logger.exception("Error during transfer")
+        logger.exception("Error during bonus issuance")
         raise HTTPException(status_code=500, detail="Transaction failed")
     
     return {"transactionId": str(transaction_id), "status": "completed"}
