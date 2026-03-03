@@ -75,3 +75,27 @@ CREATE TABLE ledger_entries (
 -- Indexes
 CREATE INDEX idx_ledger_entries_account_id ON ledger_entries(account_id);
 CREATE INDEX idx_ledger_entries_transaction_id ON ledger_entries(transaction_id);
+
+-- Deferred Ledger Integrity Trigger
+CREATE OR REPLACE FUNCTION check_ledger_integrity()
+RETURNS TRIGGER AS $$
+DECLARE
+    total_amount BIGINT;
+BEGIN
+    SELECT SUM(amount) INTO total_amount
+    FROM ledger_entries
+    WHERE transaction_id = NEW.transaction_id;
+
+    IF COALESCE(total_amount, 0) != 0 THEN
+        RAISE EXCEPTION 'Ledger integrity violation: transaction % has non-zero sum (%)', NEW.transaction_id, total_amount;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER ensure_ledger_balance
+AFTER INSERT OR UPDATE ON ledger_entries
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW
+EXECUTE FUNCTION check_ledger_integrity();

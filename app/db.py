@@ -5,7 +5,14 @@ from sqlalchemy.orm import sessionmaker
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:pass@db:5432/db")
 
-engine = create_engine(DATABASE_URL)
+# In a high concurrency environment, we need a larger connection pool
+# default is pool_size=5, max_overflow=10. For locust we use much higher limits.
+engine = create_engine(
+    DATABASE_URL, 
+    pool_size=50, 
+    max_overflow=100,
+    pool_timeout=30
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()

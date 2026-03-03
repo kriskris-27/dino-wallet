@@ -28,7 +28,7 @@ def top_up_wallet(request: transaction_schemas.TopUpRequest, db: Session = Depen
         raise HTTPException(status_code=404, detail="Account not found")
     
     account_ids = sorted([user_account.id, treasury_account.id])
-    balances = db.query(Balance).filter(Balance.account_id.in_(account_ids)).with_for_update().all()
+    balances = db.query(Balance).filter(Balance.account_id.in_(account_ids)).order_by(Balance.account_id).with_for_update().all()
     if len(balances) != 2:
         raise HTTPException(status_code=404, detail="Balance record not found")
         
@@ -47,7 +47,12 @@ def top_up_wallet(request: transaction_schemas.TopUpRequest, db: Session = Depen
         id=transaction_id, type=TransactionType.TOPUP, idempotency_key=scoped_key,
         asset_type_id=asset.id, amount=request.amount, from_account_id=treasury_account.id, to_account_id=user_account.id
     )
-    new_tx.entries.extend([LedgerEntry(account_id=treasury_account.id, amount=-request.amount), LedgerEntry(account_id=user_account.id, amount=request.amount)])
+    entries = [
+        LedgerEntry(account_id=treasury_account.id, amount=-request.amount), 
+        LedgerEntry(account_id=user_account.id, amount=request.amount)
+    ]
+    entries.sort(key=lambda e: e.account_id)
+    new_tx.entries.extend(entries)
     
     db.add(new_tx)
     try:
@@ -55,7 +60,7 @@ def top_up_wallet(request: transaction_schemas.TopUpRequest, db: Session = Depen
     except Exception as e:
         db.rollback()
         logger.exception("Error during top-up")
-        raise HTTPException(status_code=500, detail="Transaction failed")
+        raise HTTPException(status_code=500, detail=f"Transaction failed: {str(e)}")
     
     return {"transactionId": str(transaction_id), "status": "completed"}
 
@@ -77,7 +82,7 @@ def spend_credits(request: transaction_schemas.SpendRequest, db: Session = Depen
         raise HTTPException(status_code=404, detail="Account not found")
     
     account_ids = sorted([user_account.id, treasury_account.id])
-    balances = db.query(Balance).filter(Balance.account_id.in_(account_ids)).with_for_update().all()
+    balances = db.query(Balance).filter(Balance.account_id.in_(account_ids)).order_by(Balance.account_id).with_for_update().all()
     if len(balances) != 2:
         raise HTTPException(status_code=404, detail="Balance record not found")
         
@@ -96,7 +101,12 @@ def spend_credits(request: transaction_schemas.SpendRequest, db: Session = Depen
         id=transaction_id, type=TransactionType.SPEND, idempotency_key=scoped_key,
         asset_type_id=asset.id, amount=request.amount, from_account_id=user_account.id, to_account_id=treasury_account.id
     )
-    new_tx.entries.extend([LedgerEntry(account_id=user_account.id, amount=-request.amount), LedgerEntry(account_id=treasury_account.id, amount=request.amount)])
+    entries = [
+        LedgerEntry(account_id=user_account.id, amount=-request.amount), 
+        LedgerEntry(account_id=treasury_account.id, amount=request.amount)
+    ]
+    entries.sort(key=lambda e: e.account_id)
+    new_tx.entries.extend(entries)
     
     db.add(new_tx)
     try:
@@ -104,7 +114,7 @@ def spend_credits(request: transaction_schemas.SpendRequest, db: Session = Depen
     except Exception as e:
         db.rollback()
         logger.exception("Error during spend")
-        raise HTTPException(status_code=500, detail="Transaction failed")
+        raise HTTPException(status_code=500, detail=f"Transaction failed: {str(e)}")
     
     return {"transactionId": str(transaction_id), "status": "completed"}
 
@@ -126,7 +136,7 @@ def issue_bonus(request: transaction_schemas.BonusRequest, db: Session = Depends
         raise HTTPException(status_code=404, detail="Account not found")
     
     account_ids = sorted([user_account.id, treasury_account.id])
-    balances = db.query(Balance).filter(Balance.account_id.in_(account_ids)).with_for_update().all()
+    balances = db.query(Balance).filter(Balance.account_id.in_(account_ids)).order_by(Balance.account_id).with_for_update().all()
     if len(balances) != 2:
         raise HTTPException(status_code=404, detail="Balance record not found")
         
@@ -145,10 +155,12 @@ def issue_bonus(request: transaction_schemas.BonusRequest, db: Session = Depends
         id=transaction_id, type=TransactionType.BONUS, idempotency_key=scoped_key,
         asset_type_id=asset.id, amount=request.amount, from_account_id=treasury_account.id, to_account_id=user_account.id
     )
-    new_tx.entries.extend([
+    entries = [
         LedgerEntry(account_id=treasury_account.id, amount=-request.amount),
         LedgerEntry(account_id=user_account.id, amount=request.amount)
-    ])
+    ]
+    entries.sort(key=lambda e: e.account_id)
+    new_tx.entries.extend(entries)
     
     db.add(new_tx)
     try:
@@ -156,6 +168,6 @@ def issue_bonus(request: transaction_schemas.BonusRequest, db: Session = Depends
     except Exception as e:
         db.rollback()
         logger.exception("Error during bonus issuance")
-        raise HTTPException(status_code=500, detail="Transaction failed")
+        raise HTTPException(status_code=500, detail=f"Transaction failed: {str(e)}")
     
     return {"transactionId": str(transaction_id), "status": "completed"}
