@@ -28,12 +28,16 @@ I've automated the DB initialization. When the container starts, an entrypoint s
 Handling simultaneous transactions (like two people spending at the exact same millisecond) is the core problem. Here's my strategy:
 
 1.  **Row-Level Locking**: I use `SELECT ... FOR UPDATE` when reading balances. This locks the specific rows so no other process can touch them until the transaction commits.
-2.  **Deadlock Prevention**: To avoid circular waits, I always sort the account IDs and lock them in strict ascending order. If you're moving funds between two accounts, Account 1 always gets locked before Account 2, no matter what.
-3.  **Idempotency**: Every write request (`/topup`, `/spend`, etc.) takes an `idempotencyKey`. It's scoped to the user (`user_{id}:{key}`), so retrying a failed network request won't result in charging the user twice.
+2.  **Strict Ordering**: To avoid deadlocks, I always sort the account IDs and lock them in ascending order. I also sort the ledger entries before inserting them, ensuring the DB acquires SHARE locks on foreign keys in a deterministic path.
+3.  **DB-Level Invariants**: I added a deferred trigger (`ensure_ledger_balance`) that runs right before a transaction commits. It sums all ledger amounts and kills the transaction if they aren't exactly zero. This means the DB itself blocks anyone (even me) from middle-man-ing the money.
+4.  **Idempotency**: Every write request (`/topup`, `/spend`, etc.) takes an `idempotencyKey`. It's scoped to the user (`user_{id}:{key}`), so retrying a failed network request won't result in charging the user twice.
 
-## Testing with CURL
+## Testing & Verification
 
-Here are some commands to test the API once it's running:
+### 1. Load Testing
+I used **Locust** to blast the API with hundreds of concurrent users. Through this, I found and fixed a deep PostgreSQL deadlock involving foreign key share locks. The system is now verified to handle a high volume of transactions without error.
+
+### 2. Manual CURL Commands
 
 ### 1. Check Balances (User 1)
 ```bash
